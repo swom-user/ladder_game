@@ -30,9 +30,13 @@ class Participant {
   /// JSON에서 객체 생성
   factory Participant.fromJson(Map<String, dynamic> json) {
     return Participant(
-      name: json['name'] ?? '',
-      result: json['result'] ?? '',
-      image: json['image'] ?? '',
+      name: (json['name'] as String?)?.isNotEmpty == true
+          ? json['name']
+          : '참가자',
+      result: (json['result'] as String?)?.isNotEmpty == true
+          ? json['result']
+          : '결과',
+      image: json['image'] ?? '🏆',
     );
   }
 

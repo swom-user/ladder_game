@@ -20,7 +20,9 @@ class LadderPainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round;
 
-    final double columnWidth = size.width / participantCount;
+    const double margin = 40.0;
+    final double columnWidth =
+        (size.width - margin * 2) / (participantCount - 1);
     final double rowHeight = size.height / (ladderRows + 1);
 
     // 세로선 그리기

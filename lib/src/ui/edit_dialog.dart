@@ -130,6 +130,13 @@ class _EditDialogState extends State<EditDialog> {
   }
 
   void _onSave() {
+    final names = _nameControllers.map((c) => c.text.trim()).toList();
+    final uniqueNames = names.toSet();
+
+    if (uniqueNames.length != names.length) {
+      return;
+    }
+
     final updatedParticipants = List<Participant>.generate(
       widget.participants.length,
       (index) => Participant(

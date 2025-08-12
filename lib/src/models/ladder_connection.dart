@@ -11,6 +11,18 @@ class LadderConnection {
 
   LadderConnection(this.rows);
 
+  factory LadderConnection.empty({
+    required int participantCount,
+    required int ladderRows,
+  }) {
+    return LadderConnection(
+      List.generate(
+        ladderRows,
+        (_) => List.filled(participantCount - 1, false),
+      ),
+    );
+  }
+
   /// 랜덤으로 가로줄 연결 상태를 생성하는 팩토리 메서드
   factory LadderConnection.generate({
     required int participantCount,
@@ -48,6 +60,16 @@ class LadderConnection {
     if (row < 0 || row >= rows.length) return false;
     if (col < 0 || col >= rows[row].length) return false;
     return rows[row][col];
+  }
+
+  bool isValidConnection() {
+    for (var row in rows) {
+      // 연속 가로줄 체크
+      for (int i = 0; i < row.length - 1; i++) {
+        if (row[i] && row[i + 1]) return false;
+      }
+    }
+    return true;
   }
 
   /// 연결 상태를 문자열로 디버그 출력

@@ -1,6 +1,6 @@
 // lib/ladder_game.dart
 
-library ladder_game;
+library;
 
 // Logic
 export 'src/logic/ladder_game_controller.dart';

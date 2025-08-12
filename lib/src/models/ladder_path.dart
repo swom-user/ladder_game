@@ -19,7 +19,8 @@ class LadderPath {
 
   /// 현재 단계의 열 인덱스 반환
   int columnAt(int step) {
-    if (step < 0 || step >= steps.length) return endIndex;
+    if (step < 0) return startIndex;
+    if (step >= steps.length) return endIndex;
     return steps[step];
   }
 

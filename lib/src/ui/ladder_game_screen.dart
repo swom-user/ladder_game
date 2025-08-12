@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ladder_game/ladder_game.dart';
 
+import 'line_animated_position.dart';
+
 class LadderGameScreen extends StatefulWidget {
   final LadderGameController controller;
 
@@ -85,7 +87,7 @@ class _LadderGameScreenState extends State<LadderGameScreen> {
         participants: widget.controller.participants,
         onSave: (updatedParticipants) {
           setState(() {
-            widget.controller.participants = updatedParticipants;
+            widget.controller.updateAllParticipants(updatedParticipants);
             widget.controller.shuffleConnections();
           });
         },
@@ -106,7 +108,7 @@ class _LadderGameScreenState extends State<LadderGameScreen> {
 
     // 단계별로 애니메이션 실행 (세로 이동만)
     for (int step = 0; step <= maxSteps; step++) {
-      await Future.delayed(const Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 1400));
       setState(() {
         currentStep = step;
       });
@@ -164,18 +166,7 @@ class _LadderGameScreenState extends State<LadderGameScreen> {
 
           return Stack(
             children: [
-              // 사다리 배경
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: LadderPainter(
-                    participantCount: widget.controller.participantCount,
-                    ladderRows: widget.controller.ladderRows,
-                    connections: widget.controller.connection.rows,
-                  ),
-                ),
-              ),
-
-              // 시작 라벨들
+              // 시작 라벨들 (참가자 이름)
               ...List.generate(widget.controller.participantCount, (index) {
                 final dx = columnWidth * index + columnWidth / 2 - 30;
                 return Positioned(
@@ -202,6 +193,20 @@ class _LadderGameScreenState extends State<LadderGameScreen> {
                   ),
                 );
               }),
+
+              // 사다리 배경 (CustomPaint) - 참가자 이름 라벨 아래, 결과 라벨 위
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 50),
+                  child: CustomPaint(
+                    painter: LadderPainter(
+                      participantCount: widget.controller.participantCount,
+                      ladderRows: widget.controller.ladderRows,
+                      connections: widget.controller.connection.rows,
+                    ),
+                  ),
+                ),
+              ),
 
               // 결과 라벨들
               ...List.generate(widget.controller.participantCount, (index) {
@@ -238,16 +243,26 @@ class _LadderGameScreenState extends State<LadderGameScreen> {
                   final path = widget.controller.paths[index];
                   final stepIndex = currentStep.clamp(0, path.length - 1);
 
-                  // 현재 스텝에서의 위치 계산
                   final currentCol = path.columnAt(stepIndex);
                   final dx = columnWidth * currentCol + columnWidth / 2 - 20;
-                  final dy = 40 + rowHeight * stepIndex;
+                  final dy = 50 + rowHeight * stepIndex;
 
-                  return AnimatedPositioned(
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeInOut,
-                    left: dx,
-                    top: dy,
+                  // 이전 위치 계산 (이전 스텝 위치)
+                  final prevStepIndex = (stepIndex - 1).clamp(
+                    0,
+                    path.length - 1,
+                  );
+                  final prevCol = path.columnAt(prevStepIndex);
+                  final prevDx = columnWidth * prevCol + columnWidth / 2 - 20;
+                  final prevDy = 50 + rowHeight * prevStepIndex;
+
+                  return LineAnimatedPosition(
+                    key: ValueKey('participant_${index}_step_$currentStep'),
+                    startX: prevDx,
+                    startY: prevDy,
+                    targetX: dx,
+                    targetY: dy,
+                    duration: const Duration(milliseconds: 1400),
                     child: Container(
                       width: 40,
                       height: 40,
@@ -257,7 +272,9 @@ class _LadderGameScreenState extends State<LadderGameScreen> {
                         border: Border.all(color: Colors.green[400]!, width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.green.withOpacity(0.3),
+                            color: Colors.green.withAlpha(
+                              (255.0 * 0.3).round(),
+                            ),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -294,7 +311,7 @@ class _LadderGameScreenState extends State<LadderGameScreen> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.green.withAlpha((255.0 * 0.2).round()),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),

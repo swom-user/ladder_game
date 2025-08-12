@@ -25,12 +25,14 @@ class ResultDialog extends StatelessWidget {
           Icon(Icons.celebration, color: Colors.orange),
         ],
       ),
-      content: Container(
+      content: SizedBox(
         width: double.maxFinite,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(participants.length, (i) {
+            if (i >= finalPositions.length) return const SizedBox();
             final pos = finalPositions[i];
+            if (pos >= participants.length) return const SizedBox();
             final participant = participants[i];
             final resultParticipant = participants[pos];
             return Container(
@@ -45,7 +47,7 @@ class ResultDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
+                    color: Colors.green.withAlpha((255.0 * 0.3).round()),
                     spreadRadius: 1,
                     blurRadius: 3,
                     offset: const Offset(0, 2),

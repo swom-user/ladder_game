@@ -13,8 +13,13 @@ class LadderTracer {
   }) {
     List<int> steps = [startColumn];
     int currentColumn = startColumn;
+    int maxSteps = connection.rows.length + 1;
 
-    for (int row = 0; row < connection.rows.length; row++) {
+    for (
+      int row = 0;
+      row < connection.rows.length && steps.length <= maxSteps;
+      row++
+    ) {
       if (currentColumn > 0 &&
           connection.hasConnection(row, currentColumn - 1)) {
         // 왼쪽으로 이동
