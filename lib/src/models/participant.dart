@@ -30,14 +30,43 @@ class Participant {
   /// JSON에서 객체 생성
   factory Participant.fromJson(Map<String, dynamic> json) {
     return Participant(
-      name: (json['name'] as String?)?.isNotEmpty == true
-          ? json['name']
-          : '참가자',
-      result: (json['result'] as String?)?.isNotEmpty == true
-          ? json['result']
-          : '결과',
-      image: json['image'] ?? '🏆',
+      name: json['name'] ?? '',
+      result: json['result'] ?? '',
+      image: json['image'] ?? '',
     );
+  }
+
+  /// 문자열로 반환하는 메서드들 (paste-2.txt에서 사용하는 형태로)
+  static List<String> getNamesFromParticipants(List<Participant> participants) {
+    return participants.map((p) => p.name).toList();
+  }
+
+  static List<String> getResultsFromParticipants(
+    List<Participant> participants,
+  ) {
+    return participants.map((p) => p.result).toList();
+  }
+
+  static List<String> getImagesFromParticipants(
+    List<Participant> participants,
+  ) {
+    return participants.map((p) => p.image).toList();
+  }
+
+  /// 문자열 리스트들로부터 Participant 리스트 생성
+  static List<Participant> fromStringLists({
+    required List<String> names,
+    required List<String> results,
+    required List<String> images,
+  }) {
+    final length = names.length;
+    return List.generate(length, (i) {
+      return Participant(
+        name: i < names.length ? names[i] : '참가자 ${i + 1}',
+        result: i < results.length ? results[i] : '결과 ${i + 1}',
+        image: i < images.length ? images[i] : '🏆',
+      );
+    });
   }
 
   @override

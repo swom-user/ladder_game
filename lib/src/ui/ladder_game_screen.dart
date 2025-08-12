@@ -1,472 +1,815 @@
-import 'package:flutter/material.dart';
-import 'package:ladder_game/ladder_game.dart';
+// lib/src/ui/ladder_game_screen.dart
 
-import 'line_animated_position.dart';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+
+import '../logic/ladder_generator.dart';
+import 'edit_dialog.dart';
+import 'ladder_painter.dart';
 
 class LadderGameScreen extends StatefulWidget {
-  final LadderGameController controller;
-
-  const LadderGameScreen({super.key, required this.controller});
+  const LadderGameScreen({super.key});
 
   @override
   State<LadderGameScreen> createState() => _LadderGameScreenState();
 }
 
-class _LadderGameScreenState extends State<LadderGameScreen> {
-  bool isAnimating = false;
-  int currentStep = 0;
+class _LadderGameScreenState extends State<LadderGameScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _resultAnimationController;
+  late AnimationController _stepAnimationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _rotationAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _stepAnimation;
 
-  int get participantCount => widget.controller.participantCount;
-  int get ladderRows => widget.controller.ladderRows;
+  int participantCount = 2;
+  List<List<bool>> ladderConnections = [];
+  List<String> participantNames = [];
+  List<String> results = [];
+  List<List<int>> allPaths = [];
+  List<String> resultImages = [];
+  bool isAnimating = false;
+  int currentAnimationStep = 0;
+  bool showFinalResults = false;
+  List<int> finalResults = [];
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("사다리 게임")),
-      body: Column(
-        children: [
-          // 사다리 게임 영역을 더 작게 조정
-          Expanded(
-            flex: 3, // 전체의 3/5 비율
-            child: _buildLadderGame(),
-          ),
-          // 컨트롤 패널 영역 확대
-          Expanded(
-            flex: 2, // 전체의 2/5 비율
-            child: _buildControlPanel(),
-          ),
-        ],
+  void initState() {
+    super.initState();
+    _setupAnimations();
+    _initializeLadder();
+  }
+
+  @override
+  void dispose() {
+    _resultAnimationController.dispose();
+    _stepAnimationController.dispose();
+    super.dispose();
+  }
+
+  void _setupAnimations() {
+    _resultAnimationController = AnimationController(
+      duration: Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _stepAnimationController = AnimationController(
+      duration: Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _resultAnimationController,
+        curve: Curves.elasticOut,
+      ),
+    );
+
+    _rotationAnimation = Tween<double>(begin: 0.0, end: 2 * pi).animate(
+      CurvedAnimation(
+        parent: _resultAnimationController,
+        curve: Interval(0.0, 0.7, curve: Curves.easeInOut),
+      ),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _resultAnimationController,
+        curve: Interval(0.3, 1.0, curve: Curves.easeIn),
+      ),
+    );
+
+    _stepAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _stepAnimationController,
+        curve: Curves.easeInOut,
       ),
     );
   }
 
+  void _initializeLadder() {
+    _updateParticipantNames();
+    _updateResults();
+    _updateResultImages();
+    _generateLadderConnections();
+  }
+
+  void _updateParticipantNames() {
+    List<String> newParticipantNames = [];
+    for (int i = 0; i < participantCount; i++) {
+      if (i < participantNames.length) {
+        newParticipantNames.add(participantNames[i]);
+      } else {
+        newParticipantNames.add('참가자 ${i + 1}');
+      }
+    }
+    participantNames = newParticipantNames;
+  }
+
+  void _updateResults() {
+    List<String> newResults = [];
+    for (int i = 0; i < participantCount; i++) {
+      if (i < results.length) {
+        newResults.add(results[i]);
+      } else {
+        newResults.add('결과 ${i + 1}');
+      }
+    }
+    results = newResults;
+  }
+
+  void _updateResultImages() {
+    List<String> defaultImages = [
+      '🏆',
+      '🎁',
+      '🍕',
+      '☕',
+      '🎵',
+      '📚',
+      '🎮',
+      '🌟',
+    ];
+
+    List<String> newResultImages = [];
+    for (int i = 0; i < participantCount; i++) {
+      if (i < resultImages.length) {
+        newResultImages.add(resultImages[i]);
+      } else {
+        newResultImages.add(defaultImages[i % defaultImages.length]);
+      }
+    }
+    resultImages = newResultImages;
+  }
+
+  void _generateLadderConnections() {
+    final connection = LadderGenerator.generate(
+      participantCount: participantCount,
+    );
+
+    ladderConnections = connection.rows;
+  }
+
   void _addParticipant() {
     setState(() {
-      widget.controller.addParticipant(
-        Participant(
-          name: '참가자 ${participantCount + 1}',
-          result: '결과 ${participantCount + 1}',
-          image: '🏆',
-        ),
-      );
+      participantCount++;
+      _initializeLadder();
     });
   }
 
   void _removeParticipant() {
     if (participantCount > 2) {
       setState(() {
-        widget.controller.removeParticipant(participantCount - 1);
+        participantCount--;
+        _initializeLadder();
       });
     }
   }
 
-  void _addLadderRow() {
-    setState(() {
-      widget.controller.setLadderRows(ladderRows + 1);
-    });
+  // 수정된 경로 추적 메서드 - 맨 아래까지 내려가도록 수정
+  List<int> _traceLadderPath(int startColumn) {
+    List<int> path = [startColumn];
+    int currentColumn = startColumn;
+
+    // 모든 사다리 행을 통과하면서 경로 추적
+    for (int row = 0; row < ladderConnections.length; row++) {
+      // 왼쪽으로 이동 가능한지 체크
+      if (currentColumn > 0 && ladderConnections[row][currentColumn - 1]) {
+        currentColumn--;
+      }
+      // 오른쪽으로 이동 가능한지 체크
+      else if (currentColumn < participantCount - 1 &&
+          ladderConnections[row][currentColumn]) {
+        currentColumn++;
+      }
+      // 이동 후 위치를 path에 추가
+      path.add(currentColumn);
+    }
+
+    return path;
   }
 
-  void _removeLadderRow() {
-    if (ladderRows > 1) {
+  // 수정된 애니메이션 메서드 - 최종 결과까지 보여주도록 수정
+  void _startAllAnimation() async {
+    if (isAnimating) return;
+
+    List<List<int>> paths = [];
+    for (int i = 0; i < participantCount; i++) {
+      paths.add(_traceLadderPath(i));
+    }
+
+    setState(() {
+      isAnimating = true;
+      allPaths = paths;
+      currentAnimationStep = 0;
+      showFinalResults = false;
+      finalResults = paths.map((path) => path.last).toList();
+    });
+
+    // 경로의 전체 스텝 수 (시작점 포함하여 ladderConnections.length + 1)
+    int maxSteps = paths.isNotEmpty ? paths[0].length - 1 : 0;
+
+    // 모든 스텝을 애니메이션으로 진행 (최종 결과 위치까지)
+    for (int i = 0; i <= maxSteps; i++) {
       setState(() {
-        widget.controller.setLadderRows(ladderRows - 1);
+        currentAnimationStep = i;
       });
+
+      _stepAnimationController.reset();
+      await _stepAnimationController.forward();
+
+      await Future.delayed(Duration(milliseconds: 200));
     }
+
+    await Future.delayed(Duration(milliseconds: 500));
+
+    setState(() {
+      showFinalResults = true;
+    });
+
+    _resultAnimationController.forward().then((_) {
+      Future.delayed(Duration(milliseconds: 500), () {
+        _showAllResultsDialog(paths);
+      });
+    });
+
+    await Future.delayed(Duration(milliseconds: 3000));
+
+    setState(() {
+      isAnimating = false;
+      allPaths = [];
+      currentAnimationStep = 0;
+      showFinalResults = false;
+    });
+
+    _resultAnimationController.reset();
   }
 
-  void _generateLadderConnections() {
+  void _startSingleAnimation(int participantIndex) async {
+    if (isAnimating) return;
+
+    List<int> singlePath = _traceLadderPath(participantIndex);
+
     setState(() {
-      widget.controller.shuffleConnections();
+      isAnimating = true;
+      allPaths = [singlePath];
+      currentAnimationStep = 0;
+      showFinalResults = false;
+      finalResults = [singlePath.last];
     });
+
+    // 경로의 모든 스텝을 애니메이션으로 진행
+    for (int i = 0; i <= singlePath.length - 1; i++) {
+      setState(() {
+        currentAnimationStep = i;
+      });
+
+      _stepAnimationController.reset();
+      await _stepAnimationController.forward();
+
+      await Future.delayed(Duration(milliseconds: 150));
+    }
+
+    await Future.delayed(Duration(milliseconds: 300));
+
+    setState(() {
+      showFinalResults = true;
+    });
+
+    _resultAnimationController.forward();
+
+    await Future.delayed(Duration(milliseconds: 800));
+
+    _showSingleResultDialog(
+      participantNames[participantIndex],
+      singlePath.last,
+    );
+
+    setState(() {
+      isAnimating = false;
+      allPaths = [];
+      currentAnimationStep = 0;
+      showFinalResults = false;
+    });
+
+    _resultAnimationController.reset();
+  }
+
+  void _showAllResultsDialog(List<List<int>> paths) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Text('🎉 게임 결과'),
+              Spacer(),
+              Icon(Icons.celebration, color: Colors.orange),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(participantCount, (i) {
+                int finalPosition = paths[i].last;
+                return Container(
+                  margin: EdgeInsets.symmetric(vertical: 8),
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue[100]!, Colors.purple[100]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withAlpha((255.0 * 0.3).round()),
+                        spreadRadius: 1,
+                        blurRadius: 3,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.blue[200],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Center(
+                          child: Text(
+                            participantNames[i].substring(
+                              0,
+                              min(2, participantNames[i].length),
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Icon(Icons.arrow_forward, color: Colors.grey[600]),
+                      SizedBox(width: 16),
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Center(
+                          child: Text(
+                            resultImages[finalPosition],
+                            style: TextStyle(fontSize: 24),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          results[finalPosition],
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.refresh),
+                  SizedBox(width: 4),
+                  Text('다시 하기'),
+                ],
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _generateLadderConnections();
+                });
+              },
+            ),
+            TextButton(
+              child: Text('확인'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSingleResultDialog(String participant, int resultIndex) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('🎯 결과'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.purple[100]!, Colors.blue[100]!],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      participant,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withAlpha((255.0 * 0.3).round()),
+                            spreadRadius: 2,
+                            blurRadius: 5,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          resultImages[resultIndex],
+                          style: TextStyle(fontSize: 36),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      results[resultIndex],
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('확인'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showEditDialog() {
     showDialog(
       context: context,
       builder: (context) => EditDialog(
-        participants: widget.controller.participants,
-        onSave: (updatedParticipants) {
+        participantNames: participantNames,
+        results: results,
+        resultImages: resultImages,
+        onSave: (names, resultTexts, images) {
           setState(() {
-            widget.controller.updateAllParticipants(updatedParticipants);
-            widget.controller.shuffleConnections();
+            participantNames = names;
+            results = resultTexts;
+            resultImages = images;
           });
         },
       ),
     );
   }
 
-  void _startAnimation() async {
-    setState(() {
-      isAnimating = true;
-      currentStep = 0;
-      widget.controller.startGame();
-    });
-
-    final maxSteps = widget.controller.paths.isNotEmpty
-        ? widget.controller.paths[0].length - 1
-        : 0;
-
-    // 단계별로 애니메이션 실행 (세로 이동만)
-    for (int step = 0; step <= maxSteps; step++) {
-      await Future.delayed(const Duration(milliseconds: 1400));
-      setState(() {
-        currentStep = step;
-      });
-    }
-
-    // 결과 표시
-    await Future.delayed(const Duration(milliseconds: 500));
-    _showResultDialog();
-
-    setState(() {
-      isAnimating = false;
-      currentStep = 0;
-    });
-  }
-
-  void _showResultDialog() {
-    final results = widget.controller.getResults();
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("🎉 게임 결과"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: results.entries.map((entry) {
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.blue[100],
-                child: Text(entry.key.name.substring(0, 1)),
-              ),
-              title: Text(entry.key.name),
-              subtitle: Text("결과: ${entry.value}"),
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("닫기"),
-          ),
+  Widget _buildLadderGame() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        children: [
+          _buildParticipantNames(),
+          Expanded(child: _buildLadderCanvas()),
+          _buildResultsSection(),
         ],
       ),
     );
   }
 
-  Widget _buildLadderGame() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final columnWidth =
-              constraints.maxWidth / widget.controller.participantCount;
-          final totalHeight = constraints.maxHeight - 80; // 상하 여백 고려
-          final rowHeight = totalHeight / (widget.controller.ladderRows + 1);
-
-          return Stack(
-            children: [
-              // 시작 라벨들 (참가자 이름)
-              ...List.generate(widget.controller.participantCount, (index) {
-                final dx = columnWidth * index + columnWidth / 2 - 30;
-                return Positioned(
-                  left: dx,
-                  top: 10,
-                  child: Container(
-                    width: 60,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: Colors.blue[100],
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.blue[300]!),
-                    ),
-                    child: Center(
-                      child: Text(
-                        widget.controller.participants[index].name,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                );
-              }),
-
-              // 사다리 배경 (CustomPaint) - 참가자 이름 라벨 아래, 결과 라벨 위
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 50),
-                  child: CustomPaint(
-                    painter: LadderPainter(
-                      participantCount: widget.controller.participantCount,
-                      ladderRows: widget.controller.ladderRows,
-                      connections: widget.controller.connection.rows,
-                    ),
-                  ),
-                ),
-              ),
-
-              // 결과 라벨들
-              ...List.generate(widget.controller.participantCount, (index) {
-                final dx = columnWidth * index + columnWidth / 2 - 30;
-                final dy = totalHeight + 40;
-                return Positioned(
-                  left: dx,
-                  top: dy,
-                  child: Container(
-                    width: 60,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: Colors.orange[100],
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.orange[300]!),
-                    ),
-                    child: Center(
-                      child: Text(
-                        widget.controller.participants[index].result,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                );
-              }),
-
-              // 애니메이션 아이콘들
-              if (isAnimating)
-                ...List.generate(widget.controller.participantCount, (index) {
-                  final path = widget.controller.paths[index];
-                  final stepIndex = currentStep.clamp(0, path.length - 1);
-
-                  final currentCol = path.columnAt(stepIndex);
-                  final dx = columnWidth * currentCol + columnWidth / 2 - 20;
-                  final dy = 50 + rowHeight * stepIndex;
-
-                  // 이전 위치 계산 (이전 스텝 위치)
-                  final prevStepIndex = (stepIndex - 1).clamp(
-                    0,
-                    path.length - 1,
-                  );
-                  final prevCol = path.columnAt(prevStepIndex);
-                  final prevDx = columnWidth * prevCol + columnWidth / 2 - 20;
-                  final prevDy = 50 + rowHeight * prevStepIndex;
-
-                  return LineAnimatedPosition(
-                    key: ValueKey('participant_${index}_step_$currentStep'),
-                    startX: prevDx,
-                    startY: prevDy,
-                    targetX: dx,
-                    targetY: dy,
-                    duration: const Duration(milliseconds: 1400),
+  Widget _buildParticipantNames() {
+    return SizedBox(
+      height: 60,
+      child: Row(
+        children: List.generate(participantCount, (index) {
+          return Expanded(
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 2),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: () => _startSingleAnimation(index),
                     child: Container(
-                      width: 40,
-                      height: 40,
+                      height: 30,
                       decoration: BoxDecoration(
-                        color: Colors.green[100],
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.green[400]!, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withAlpha(
-                              (255.0 * 0.3).round(),
-                            ),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        color: Colors.blue[100],
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.blue),
                       ),
                       child: Center(
                         child: Text(
-                          widget.controller.participants[index].name.substring(
-                            0,
-                            1,
-                          ),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
-                            fontSize: 16,
-                          ),
+                          participantNames[index],
+                          style: TextStyle(fontSize: 12),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
-                  );
-                }),
-            ],
+                  ),
+                  SizedBox(
+                    height: 20,
+                    child:
+                        allPaths.isNotEmpty &&
+                            currentAnimationStep == 0 &&
+                            allPaths.any(
+                              (path) => path.isNotEmpty && path[0] == index,
+                            )
+                        ? Icon(Icons.circle, color: Colors.red, size: 12)
+                        : SizedBox(),
+                  ),
+                ],
+              ),
+            ),
           );
-        },
+        }),
+      ),
+    );
+  }
+
+  Widget _buildLadderCanvas() {
+    return AnimatedBuilder(
+      animation: _stepAnimationController,
+      builder: (context, child) {
+        return CustomPaint(
+          size: Size(double.infinity, double.infinity),
+          painter: LadderPainter(
+            participantCount: participantCount,
+            ladderRows: ladderConnections.length,
+            connections: ladderConnections,
+            allPaths: allPaths,
+            currentStep: currentAnimationStep,
+            animationProgress: _stepAnimation.value,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildResultsSection() {
+    return SizedBox(
+      height: 120,
+      child: Column(
+        children: [
+          _buildEndPositionIndicators(),
+          _buildResultImageAnimations(),
+          _buildResultTexts(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEndPositionIndicators() {
+    return SizedBox(
+      height: 20,
+      child: Row(
+        children: List.generate(participantCount, (index) {
+          return Expanded(
+            child: Center(
+              child:
+                  allPaths.isNotEmpty &&
+                      allPaths[0].isNotEmpty &&
+                      currentAnimationStep == allPaths[0].length - 1 &&
+                      allPaths.any((path) => path.last == index)
+                  ? Icon(Icons.circle, color: Colors.red, size: 12)
+                  : SizedBox(),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildResultImageAnimations() {
+    if (!showFinalResults) return SizedBox(height: 40);
+
+    return SizedBox(
+      height: 40,
+      child: Row(
+        children: List.generate(participantCount, (index) {
+          bool shouldShow = finalResults.contains(index);
+          return Expanded(
+            child: Center(
+              child: shouldShow
+                  ? AnimatedBuilder(
+                      animation: _resultAnimationController,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _scaleAnimation.value,
+                          child: Transform.rotate(
+                            angle: _rotationAnimation.value,
+                            child: Opacity(
+                              opacity: _fadeAnimation.value,
+                              child: Container(
+                                width: 35,
+                                height: 35,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withAlpha(
+                                        (255.0 * 0.5).round(),
+                                      ),
+                                      spreadRadius: 1,
+                                      blurRadius: 3,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    resultImages[index],
+                                    style: TextStyle(fontSize: 20),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : SizedBox(),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildResultTexts() {
+    return Expanded(
+      child: Row(
+        children: List.generate(participantCount, (index) {
+          return Expanded(
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 2),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.green[100],
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: Center(
+                  child: Text(
+                    results[index],
+                    style: TextStyle(fontSize: 12),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
 
   Widget _buildControlPanel() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.grey[100],
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withAlpha((255.0 * 0.2).round()),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildParticipantCountControls(),
+          SizedBox(height: 16),
+          _buildActionButtons(),
+          SizedBox(height: 8),
+          _buildStartGameButton(),
         ],
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    );
+  }
+
+  Widget _buildParticipantCountControls() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('참가자 수: $participantCount'),
+        Row(
           children: [
-            // 참가자 수 조절
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '참가자 수: $participantCount',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: participantCount > 2
-                              ? _removeParticipant
-                              : null,
-                          icon: const Icon(Icons.remove),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.red[100],
-                            foregroundColor: Colors.red[700],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: _addParticipant,
-                          icon: const Icon(Icons.add),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.blue[100],
-                            foregroundColor: Colors.blue[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            IconButton(
+              onPressed: _removeParticipant,
+              icon: Icon(Icons.remove),
+              style: IconButton.styleFrom(backgroundColor: Colors.red[100]),
             ),
-
-            const SizedBox(height: 8),
-
-            // 사다리 줄 수 조절
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '사다리 줄 수: $ladderRows',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: ladderRows > 1 ? _removeLadderRow : null,
-                          icon: const Icon(Icons.remove),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.red[100],
-                            foregroundColor: Colors.red[700],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: _addLadderRow,
-                          icon: const Icon(Icons.add),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.blue[100],
-                            foregroundColor: Colors.blue[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 기능 버튼들
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: isAnimating ? null : _generateLadderConnections,
-                    icon: const Icon(Icons.shuffle),
-                    label: const Text('사다리 섞기'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple[100],
-                      foregroundColor: Colors.purple[700],
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: isAnimating ? null : _showEditDialog,
-                    icon: const Icon(Icons.edit),
-                    label: const Text('이름/결과 편집'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange[100],
-                      foregroundColor: Colors.orange[700],
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // 게임 시작 버튼
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: isAnimating ? null : _startAnimation,
-                icon: Icon(
-                  isAnimating ? Icons.hourglass_empty : Icons.play_arrow,
-                ),
-                label: Text(
-                  isAnimating ? '게임 진행 중...' : '🎮 사다리게임 시작!',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isAnimating ? Colors.grey : Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  elevation: 4,
-                ),
-              ),
+            SizedBox(width: 8),
+            IconButton(
+              onPressed: _addParticipant,
+              icon: Icon(Icons.add),
+              style: IconButton.styleFrom(backgroundColor: Colors.blue[100]),
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _generateLadderConnections();
+              });
+            },
+            child: Text('사다리 다시 그리기'),
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: _showEditDialog,
+            child: Text('이름/결과 편집'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStartGameButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: isAnimating ? null : _startAllAnimation,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(vertical: 12),
+        ),
+        child: Text(
+          isAnimating ? '게임 진행 중...' : '🎮 사다리게임 시작!',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      appBar: AppBar(title: Text('사다리게임'), backgroundColor: Colors.blue),
+      body: Column(
+        children: [
+          Expanded(child: _buildLadderGame()),
+          _buildControlPanel(),
+        ],
       ),
     );
   }

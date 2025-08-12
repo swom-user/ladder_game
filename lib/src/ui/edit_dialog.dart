@@ -2,18 +2,22 @@
 
 import 'package:flutter/material.dart';
 
-import '../models/participant.dart';
-
-/// 이름, 결과, 이미지 편집 다이얼로그 위젯
 class EditDialog extends StatefulWidget {
-  final List<Participant> participants;
-
-  /// 변경 완료 후 호출되는 콜백
-  final void Function(List<Participant> updatedParticipants) onSave;
+  final List<String> participantNames;
+  final List<String> results;
+  final List<String> resultImages;
+  final void Function(
+    List<String> names,
+    List<String> results,
+    List<String> images,
+  )
+  onSave;
 
   const EditDialog({
     super.key,
-    required this.participants,
+    required this.participantNames,
+    required this.results,
+    required this.resultImages,
     required this.onSave,
   });
 
@@ -56,13 +60,13 @@ class _EditDialogState extends State<EditDialog> {
   @override
   void initState() {
     super.initState();
-    _nameControllers = widget.participants
-        .map((p) => TextEditingController(text: p.name))
+    _nameControllers = widget.participantNames
+        .map((name) => TextEditingController(text: name))
         .toList();
-    _resultControllers = widget.participants
-        .map((p) => TextEditingController(text: p.result))
+    _resultControllers = widget.results
+        .map((result) => TextEditingController(text: result))
         .toList();
-    _images = widget.participants.map((p) => p.image).toList();
+    _images = List.from(widget.resultImages);
   }
 
   @override
@@ -130,27 +134,21 @@ class _EditDialogState extends State<EditDialog> {
   }
 
   void _onSave() {
-    final names = _nameControllers.map((c) => c.text.trim()).toList();
-    final uniqueNames = names.toSet();
-
-    if (uniqueNames.length != names.length) {
-      return;
-    }
-
-    final updatedParticipants = List<Participant>.generate(
-      widget.participants.length,
-      (index) => Participant(
-        name: _nameControllers[index].text.isNotEmpty
-            ? _nameControllers[index].text
-            : '참가자 ${index + 1}',
-        result: _resultControllers[index].text.isNotEmpty
-            ? _resultControllers[index].text
-            : '결과 ${index + 1}',
-        image: _images[index],
-      ),
+    final updatedNames = List<String>.generate(
+      widget.participantNames.length,
+      (index) => _nameControllers[index].text.isNotEmpty
+          ? _nameControllers[index].text
+          : '참가자 ${index + 1}',
     );
 
-    widget.onSave(updatedParticipants);
+    final updatedResults = List<String>.generate(
+      widget.results.length,
+      (index) => _resultControllers[index].text.isNotEmpty
+          ? _resultControllers[index].text
+          : '결과 ${index + 1}',
+    );
+
+    widget.onSave(updatedNames, updatedResults, _images);
     Navigator.of(context).pop();
   }
 
@@ -170,7 +168,7 @@ class _EditDialogState extends State<EditDialog> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-              ...List.generate(widget.participants.length, (index) {
+              ...List.generate(widget.participantNames.length, (index) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: TextField(
@@ -192,7 +190,7 @@ class _EditDialogState extends State<EditDialog> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-              ...List.generate(widget.participants.length, (index) {
+              ...List.generate(widget.results.length, (index) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
