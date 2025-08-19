@@ -22,7 +22,7 @@ class LadderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final double verticalMargin = size.height * 0.05;
-    final double horizontalMargin = size.width * 0.05;
+    final double horizontalMargin = size.width;
     final double availableWidth = size.width - 2 * horizontalMargin;
     final double columnWidth = availableWidth / participantCount;
     final double rowHeight =

@@ -53,7 +53,7 @@ class _LadderGameScreenState extends State<LadderGameScreen>
     );
 
     _stepAnimationController = AnimationController(
-      duration: Duration(milliseconds: 200),
+      duration: Duration(milliseconds: 300),
       vsync: this,
     );
 
@@ -163,74 +163,6 @@ class _LadderGameScreenState extends State<LadderGameScreen>
       });
     }
   }
-
-  // List<int> _traceLadderPathWithJump(int startColumn) {
-  //   List<int> path = [startColumn];
-  //   int currentColumn = startColumn;
-  //
-  //   debugPrint('=== 참가자 $startColumn 경로 추적 시작 (점프 규칙) ===');
-  //
-  //   for (int row = 0; row < ladderConnections.length; row++) {
-  //     debugPrint('Row $row: 현재 위치 = $currentColumn');
-  //     debugPrint('Row $row 연결 상태: ${ladderConnections[row]}');
-  //
-  //     int newColumn = _findJumpTarget(
-  //       ladderConnections[row],
-  //       currentColumn,
-  //       participantCount,
-  //     );
-  //
-  //     if (newColumn != currentColumn) {
-  //       debugPrint('  -> 점프 이동: $currentColumn → $newColumn');
-  //       currentColumn = newColumn;
-  //     } else {
-  //       debugPrint('  -> 직진: $currentColumn');
-  //     }
-  //
-  //     path.add(currentColumn);
-  //   }
-  //
-  //   debugPrint('최종 경로: $path (도착지: ${path.last})');
-  //   debugPrint('');
-  //   return path;
-  // }
-  //
-  // int _findJumpTarget(List<bool> row, int currentColumn, int participantCount) {
-  //   debugPrint('  현재 컬럼: $currentColumn, 행 연결: $row');
-  //
-  //   int leftMostConnection = -1;
-  //   for (int i = currentColumn - 1; i >= 0; i--) {
-  //     if (i < row.length && row[i]) {
-  //       leftMostConnection = i;
-  //     } else {
-  //       break;
-  //     }
-  //   }
-  //
-  //   int rightMostConnection = -1;
-  //   for (
-  //     int i = currentColumn;
-  //     i < row.length && i < participantCount - 1;
-  //     i++
-  //   ) {
-  //     if (row[i]) {
-  //       rightMostConnection = i + 1;
-  //     } else {
-  //       break;
-  //     }
-  //   }
-  //
-  //   if (leftMostConnection >= 0) {
-  //     debugPrint('  왼쪽으로 점프: $currentColumn -> $leftMostConnection');
-  //     return leftMostConnection;
-  //   } else if (rightMostConnection >= 0) {
-  //     debugPrint('  오른쪽으로 점프: $currentColumn -> $rightMostConnection');
-  //     return rightMostConnection;
-  //   }
-  //
-  //   debugPrint('  점프 없음, 직진');
-  //   return currentColumn;
-  // }
 
   List<int> _traceLadderPath(int startColumn) {
     return _traceLadderPathStandard(startColumn);
