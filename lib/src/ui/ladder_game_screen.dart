@@ -3,10 +3,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-
-import '../logic/ladder_generator.dart';
-import 'edit_dialog.dart';
-import 'ladder_painter.dart';
+import 'package:ladder_game/ladder_game.dart';
 
 class LadderGameScreen extends StatefulWidget {
   const LadderGameScreen({super.key});
@@ -51,12 +48,12 @@ class _LadderGameScreenState extends State<LadderGameScreen>
 
   void _setupAnimations() {
     _resultAnimationController = AnimationController(
-      duration: Duration(milliseconds: 1500),
+      duration: Duration(milliseconds: 300),
       vsync: this,
     );
 
     _stepAnimationController = AnimationController(
-      duration: Duration(milliseconds: 1200),
+      duration: Duration(milliseconds: 200),
       vsync: this,
     );
 
@@ -167,57 +164,108 @@ class _LadderGameScreenState extends State<LadderGameScreen>
     }
   }
 
-  // 수정된 경로 추적 메서드 - 최종 결과까지 명확한 경로
+  // List<int> _traceLadderPathWithJump(int startColumn) {
+  //   List<int> path = [startColumn];
+  //   int currentColumn = startColumn;
+  //
+  //   debugPrint('=== 참가자 $startColumn 경로 추적 시작 (점프 규칙) ===');
+  //
+  //   for (int row = 0; row < ladderConnections.length; row++) {
+  //     debugPrint('Row $row: 현재 위치 = $currentColumn');
+  //     debugPrint('Row $row 연결 상태: ${ladderConnections[row]}');
+  //
+  //     int newColumn = _findJumpTarget(
+  //       ladderConnections[row],
+  //       currentColumn,
+  //       participantCount,
+  //     );
+  //
+  //     if (newColumn != currentColumn) {
+  //       debugPrint('  -> 점프 이동: $currentColumn → $newColumn');
+  //       currentColumn = newColumn;
+  //     } else {
+  //       debugPrint('  -> 직진: $currentColumn');
+  //     }
+  //
+  //     path.add(currentColumn);
+  //   }
+  //
+  //   debugPrint('최종 경로: $path (도착지: ${path.last})');
+  //   debugPrint('');
+  //   return path;
+  // }
+  //
+  // int _findJumpTarget(List<bool> row, int currentColumn, int participantCount) {
+  //   debugPrint('  현재 컬럼: $currentColumn, 행 연결: $row');
+  //
+  //   int leftMostConnection = -1;
+  //   for (int i = currentColumn - 1; i >= 0; i--) {
+  //     if (i < row.length && row[i]) {
+  //       leftMostConnection = i;
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  //
+  //   int rightMostConnection = -1;
+  //   for (
+  //     int i = currentColumn;
+  //     i < row.length && i < participantCount - 1;
+  //     i++
+  //   ) {
+  //     if (row[i]) {
+  //       rightMostConnection = i + 1;
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  //
+  //   if (leftMostConnection >= 0) {
+  //     debugPrint('  왼쪽으로 점프: $currentColumn -> $leftMostConnection');
+  //     return leftMostConnection;
+  //   } else if (rightMostConnection >= 0) {
+  //     debugPrint('  오른쪽으로 점프: $currentColumn -> $rightMostConnection');
+  //     return rightMostConnection;
+  //   }
+  //
+  //   debugPrint('  점프 없음, 직진');
+  //   return currentColumn;
+  // }
+
   List<int> _traceLadderPath(int startColumn) {
+    return _traceLadderPathStandard(startColumn);
+  }
+
+  List<int> _traceLadderPathStandard(int startColumn) {
     List<int> path = [startColumn];
     int currentColumn = startColumn;
 
-    // 모든 사다리 행을 통과하면서 경로 추적
     for (int row = 0; row < ladderConnections.length; row++) {
-      bool moved = false;
-
-      // 왼쪽으로 이동 가능한지 체크 (현재 위치 왼쪽에 가로줄이 있는지)
       if (currentColumn > 0 &&
-          row < ladderConnections.length &&
           (currentColumn - 1) < ladderConnections[row].length &&
           ladderConnections[row][currentColumn - 1]) {
         currentColumn--;
-        moved = true;
-      }
-      // 오른쪽으로 이동 가능한지 체크 (현재 위치에서 오른쪽으로 가로줄이 있는지)
-      else if (currentColumn < participantCount - 1 &&
-          row < ladderConnections.length &&
+      } else if (currentColumn < participantCount - 1 &&
           currentColumn < ladderConnections[row].length &&
           ladderConnections[row][currentColumn]) {
-        debugPrint('currentColumn $currentColumn');
         currentColumn++;
-        moved = true;
       }
 
-      // 이동 후 위치를 path에 추가
       path.add(currentColumn);
-
-      debugPrint(
-        'Row $row: participant $startColumn moved from ${path[path.length - 2]} to $currentColumn (moved: $moved)',
-      );
     }
 
-    debugPrint(
-      'Final path for participant $startColumn: $path -> ends at column ${path.last}',
-    );
     return path;
   }
 
-  // 수정된 애니메이션 메서드 - 최종 결과까지 보여주도록 수정
+  // 매우 빠른 애니메이션으로 수정
   void _startAllAnimation() async {
     if (isAnimating) return;
 
-    // 모든 참가자의 경로 계산
     List<List<int>> paths = [];
     for (int i = 0; i < participantCount; i++) {
       List<int> path = _traceLadderPath(i);
       paths.add(path);
-      debugPrint('Participant $i final path: $path, ends at: ${path.last}');
+      debugPrint('참가자 $i 최종 경로: $path, 도착지: ${path.last}');
     }
 
     setState(() {
@@ -228,45 +276,39 @@ class _LadderGameScreenState extends State<LadderGameScreen>
       finalResults = paths.map((path) => path.last).toList();
     });
 
-    // 경로의 전체 스텝 수 계산 (시작점 + 사다리 행 수)
-    int maxSteps = ladderConnections.length + 2; // 시작점(0) + 각 행 통과
+    int maxSteps = ladderConnections.length + 2;
 
-    debugPrint(
-      'Total animation steps: 0 to ${maxSteps - 1} (${maxSteps} steps total)',
-    );
+    debugPrint('전체 애니메이션 스텝: 0 to ${maxSteps - 1} (총 $maxSteps개)');
 
-    // 시작부터 최종 결과까지 모든 스텝을 애니메이션으로 진행
+    // 각 스텝 사이의 대기 시간을 매우 짧게 조정 (100ms → 50ms)
     for (int i = 0; i < maxSteps; i++) {
       setState(() {
         currentAnimationStep = i;
       });
 
-      debugPrint('Animation step: $i/${maxSteps - 1}');
+      debugPrint('애니메이션 스텝: $i/${maxSteps - 1}');
 
       _stepAnimationController.reset();
       await _stepAnimationController.forward();
 
-      // 각 스텝 사이의 대기 시간
+      // 스텝 간 대기 시간을 매우 짧게 조정
       if (i == maxSteps - 1) {
-        // 마지막 스텝에서는 더 긴 대기 (최종 결과 표시)
-        await Future.delayed(Duration(milliseconds: 800));
-      } else {
-        await Future.delayed(Duration(milliseconds: 400));
+        // 마지막 스텝에서는 짧은 대기 (100ms → 50ms)
+        await Future.delayed(Duration(milliseconds: 50));
       }
     }
 
-    // 최종 결과 표시
     setState(() {
       showFinalResults = true;
     });
 
     _resultAnimationController.forward().then((_) {
-      Future.delayed(Duration(milliseconds: 500), () {
+      Future.delayed(Duration(milliseconds: 200), () {
         _showAllResultsDialog(paths);
       });
     });
 
-    await Future.delayed(Duration(milliseconds: 3000));
+    await Future.delayed(Duration(milliseconds: 1500));
 
     setState(() {
       isAnimating = false;
@@ -282,7 +324,7 @@ class _LadderGameScreenState extends State<LadderGameScreen>
     if (isAnimating) return;
 
     List<int> singlePath = _traceLadderPath(participantIndex);
-    debugPrint('Single path for participant $participantIndex: $singlePath');
+    debugPrint('개별 애니메이션 - 참가자 $participantIndex 경로: $singlePath');
 
     setState(() {
       isAnimating = true;
@@ -292,22 +334,20 @@ class _LadderGameScreenState extends State<LadderGameScreen>
       finalResults = [singlePath.last];
     });
 
-    // 모든 스텝을 진행 (시작점부터 최종 결과까지)
+    // 개별 애니메이션도 빠르게 조정
     for (int i = 0; i < singlePath.length; i++) {
       setState(() {
         currentAnimationStep = i;
       });
 
-      debugPrint('Single animation step: $i');
+      debugPrint('개별 애니메이션 스텝: $i');
 
       _stepAnimationController.reset();
       await _stepAnimationController.forward();
 
       if (i == singlePath.length - 1) {
-        // 마지막 스텝에서는 더 긴 대기
-        await Future.delayed(Duration(milliseconds: 500));
-      } else {
-        await Future.delayed(Duration(milliseconds: 200));
+        // 마지막 스텝 대기 시간 단축 (100ms → 50ms)
+        await Future.delayed(Duration(milliseconds: 50));
       }
     }
 
@@ -317,7 +357,8 @@ class _LadderGameScreenState extends State<LadderGameScreen>
 
     _resultAnimationController.forward();
 
-    await Future.delayed(Duration(milliseconds: 800));
+    // 개별 결과 대기 시간 단축 (800ms → 400ms)
+    await Future.delayed(Duration(milliseconds: 400));
 
     _showSingleResultDialog(
       participantNames[participantIndex],

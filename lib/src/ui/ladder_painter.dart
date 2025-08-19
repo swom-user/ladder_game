@@ -207,13 +207,8 @@ class LadderPainter extends CustomPainter {
     double rowHeight,
   ) {
     final pathPaint = Paint()
-      ..color = color.withAlpha((255.0 * 0.8).round())
-      ..strokeWidth = 6.0
-      ..strokeCap = StrokeCap.round;
-
-    final shadowPaint = Paint()
-      ..color = color.withAlpha((255.0 * 0.3).round())
-      ..strokeWidth = 8.0
+      ..color = color.withAlpha((255.0 * 0.9).round())
+      ..strokeWidth = 5.0
       ..strokeCap = StrokeCap.round;
 
     // 현재까지의 경로만 그리기 (최종 위치까지 포함)
@@ -232,22 +227,16 @@ class LadderPainter extends CustomPainter {
           horizontalMargin + columnWidth * toCol + columnWidth / 2;
 
       if (fromCol == toCol) {
-        // 세로선 (직진) - 그림자와 메인 라인 모두 그리기
-        canvas.drawLine(Offset(fromX, fromY), Offset(toX, toY), shadowPaint);
         canvas.drawLine(Offset(fromX, fromY), Offset(toX, toY), pathPaint);
       } else {
-        // 가로이동이 있는 경우: L자 모양으로 그리기
-        // 1. 세로선 부분 (아래로)
-        canvas.drawLine(Offset(fromX, fromY), Offset(fromX, toY), shadowPaint);
         canvas.drawLine(Offset(fromX, fromY), Offset(fromX, toY), pathPaint);
 
         // 2. 가로선 부분
         final horizontalPaint = Paint()
           ..color = color.withAlpha((255.0 * 0.9).round())
-          ..strokeWidth = 7.0
+          ..strokeWidth = 5.0
           ..strokeCap = StrokeCap.round;
 
-        canvas.drawLine(Offset(fromX, toY), Offset(toX, toY), shadowPaint);
         canvas.drawLine(Offset(fromX, toY), Offset(toX, toY), horizontalPaint);
       }
     }
@@ -260,12 +249,6 @@ class LadderPainter extends CustomPainter {
       final double lastFromY = verticalMargin + rowHeight * (path.length - 1);
       final double lastToY = size.height - verticalMargin; // 바닥까지
 
-      // 마지막 세로선 그리기
-      canvas.drawLine(
-        Offset(lastX, lastFromY),
-        Offset(lastX, lastToY),
-        shadowPaint,
-      );
       canvas.drawLine(
         Offset(lastX, lastFromY),
         Offset(lastX, lastToY),
