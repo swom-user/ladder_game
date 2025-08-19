@@ -167,26 +167,44 @@ class _LadderGameScreenState extends State<LadderGameScreen>
     }
   }
 
-  // 수정된 경로 추적 메서드 - 맨 아래까지 내려가도록 수정
+  // 수정된 경로 추적 메서드 - 최종 결과까지 명확한 경로
   List<int> _traceLadderPath(int startColumn) {
     List<int> path = [startColumn];
     int currentColumn = startColumn;
 
     // 모든 사다리 행을 통과하면서 경로 추적
     for (int row = 0; row < ladderConnections.length; row++) {
-      // 왼쪽으로 이동 가능한지 체크
-      if (currentColumn > 0 && ladderConnections[row][currentColumn - 1]) {
+      bool moved = false;
+
+      // 왼쪽으로 이동 가능한지 체크 (현재 위치 왼쪽에 가로줄이 있는지)
+      if (currentColumn > 0 &&
+          row < ladderConnections.length &&
+          (currentColumn - 1) < ladderConnections[row].length &&
+          ladderConnections[row][currentColumn - 1]) {
         currentColumn--;
+        moved = true;
       }
-      // 오른쪽으로 이동 가능한지 체크
+      // 오른쪽으로 이동 가능한지 체크 (현재 위치에서 오른쪽으로 가로줄이 있는지)
       else if (currentColumn < participantCount - 1 &&
+          row < ladderConnections.length &&
+          currentColumn < ladderConnections[row].length &&
           ladderConnections[row][currentColumn]) {
+        debugPrint('currentColumn $currentColumn');
         currentColumn++;
+        moved = true;
       }
+
       // 이동 후 위치를 path에 추가
       path.add(currentColumn);
+
+      debugPrint(
+        'Row $row: participant $startColumn moved from ${path[path.length - 2]} to $currentColumn (moved: $moved)',
+      );
     }
 
+    debugPrint(
+      'Final path for participant $startColumn: $path -> ends at column ${path.last}',
+    );
     return path;
   }
 
@@ -194,9 +212,12 @@ class _LadderGameScreenState extends State<LadderGameScreen>
   void _startAllAnimation() async {
     if (isAnimating) return;
 
+    // 모든 참가자의 경로 계산
     List<List<int>> paths = [];
     for (int i = 0; i < participantCount; i++) {
-      paths.add(_traceLadderPath(i));
+      List<int> path = _traceLadderPath(i);
+      paths.add(path);
+      debugPrint('Participant $i final path: $path, ends at: ${path.last}');
     }
 
     setState(() {
@@ -207,23 +228,34 @@ class _LadderGameScreenState extends State<LadderGameScreen>
       finalResults = paths.map((path) => path.last).toList();
     });
 
-    // 경로의 전체 스텝 수 (시작점 포함하여 ladderConnections.length + 1)
-    int maxSteps = paths.isNotEmpty ? paths[0].length - 1 : 0;
+    // 경로의 전체 스텝 수 계산 (시작점 + 사다리 행 수)
+    int maxSteps = ladderConnections.length + 2; // 시작점(0) + 각 행 통과
 
-    // 모든 스텝을 애니메이션으로 진행 (최종 결과 위치까지)
-    for (int i = 0; i <= maxSteps; i++) {
+    debugPrint(
+      'Total animation steps: 0 to ${maxSteps - 1} (${maxSteps} steps total)',
+    );
+
+    // 시작부터 최종 결과까지 모든 스텝을 애니메이션으로 진행
+    for (int i = 0; i < maxSteps; i++) {
       setState(() {
         currentAnimationStep = i;
       });
 
+      debugPrint('Animation step: $i/${maxSteps - 1}');
+
       _stepAnimationController.reset();
       await _stepAnimationController.forward();
 
-      await Future.delayed(Duration(milliseconds: 200));
+      // 각 스텝 사이의 대기 시간
+      if (i == maxSteps - 1) {
+        // 마지막 스텝에서는 더 긴 대기 (최종 결과 표시)
+        await Future.delayed(Duration(milliseconds: 800));
+      } else {
+        await Future.delayed(Duration(milliseconds: 400));
+      }
     }
 
-    await Future.delayed(Duration(milliseconds: 500));
-
+    // 최종 결과 표시
     setState(() {
       showFinalResults = true;
     });
@@ -250,6 +282,7 @@ class _LadderGameScreenState extends State<LadderGameScreen>
     if (isAnimating) return;
 
     List<int> singlePath = _traceLadderPath(participantIndex);
+    debugPrint('Single path for participant $participantIndex: $singlePath');
 
     setState(() {
       isAnimating = true;
@@ -259,19 +292,24 @@ class _LadderGameScreenState extends State<LadderGameScreen>
       finalResults = [singlePath.last];
     });
 
-    // 경로의 모든 스텝을 애니메이션으로 진행
-    for (int i = 0; i <= singlePath.length - 1; i++) {
+    // 모든 스텝을 진행 (시작점부터 최종 결과까지)
+    for (int i = 0; i < singlePath.length; i++) {
       setState(() {
         currentAnimationStep = i;
       });
 
+      debugPrint('Single animation step: $i');
+
       _stepAnimationController.reset();
       await _stepAnimationController.forward();
 
-      await Future.delayed(Duration(milliseconds: 150));
+      if (i == singlePath.length - 1) {
+        // 마지막 스텝에서는 더 긴 대기
+        await Future.delayed(Duration(milliseconds: 500));
+      } else {
+        await Future.delayed(Duration(milliseconds: 200));
+      }
     }
-
-    await Future.delayed(Duration(milliseconds: 300));
 
     setState(() {
       showFinalResults = true;
@@ -616,9 +654,8 @@ class _LadderGameScreenState extends State<LadderGameScreen>
             child: Center(
               child:
                   allPaths.isNotEmpty &&
-                      allPaths[0].isNotEmpty &&
-                      currentAnimationStep == allPaths[0].length - 1 &&
-                      allPaths.any((path) => path.last == index)
+                      currentAnimationStep >= ladderConnections.length &&
+                      finalResults.contains(index)
                   ? Icon(Icons.circle, color: Colors.red, size: 12)
                   : SizedBox(),
             ),
